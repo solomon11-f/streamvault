@@ -1,0 +1,20 @@
+{
+  "settings": {
+    "entryCode": "1234"
+  },
+  "users": [
+    {
+      "id": "admin",
+      "email": "admin@streamvault.com",
+      "password": "admin123",
+      "firstName": "Admin",
+      "lastName": "",
+      "role": "admin",
+      "status": "approved",
+      "verified": true,
+      "joined": "2026-03-12T00:00:00.000Z"
+    }
+  ],
+  "videos": [],
+  "pendingVerifications": []
+}
