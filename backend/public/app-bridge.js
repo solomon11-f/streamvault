@@ -92,7 +92,7 @@
         return;
       }
       const note = data.devCode ? `${data.message}` : 'Check your email for the verification code.';
-      const code = window.prompt(`${note}\n\nEnter the 6-digit code:` , data.devCode || '');
+      const code = window.prompt(`${note}\n\nEnter the 6-digit code:`, data.devCode || '');
       if (!code) return;
       const verify = await fetch(`${API}/auth/verify`, {
         method: 'POST',
@@ -106,8 +106,8 @@
       }
       localStorage.setItem('sv_users', JSON.stringify(verified.state.users || []));
       document.getElementById('pendingCard').classList.remove('hidden');
-      ['suFirst','suLast','suEmail','suPass'].forEach(id => document.getElementById(id).value = '');
-      if (typeof toast === 'function') toast('Email verified. Waiting for admin approval.','g');
+      ['suFirst', 'suLast', 'suEmail', 'suPass'].forEach(id => document.getElementById(id).value = '');
+      if (typeof toast === 'function') toast('Email verified. Waiting for admin approval.', 'g');
     } catch (e) {
       err.textContent = 'Could not reach backend';
     }
@@ -224,7 +224,7 @@
               <div class="vid-item">
                 <div class="vid-item-thumb">▶</div>
                 <div class="vid-item-info">
-                  <div class="vid-item-name">${ep.title || `Episode ${ep.number || epIdx+1}`}</div>
+                  <div class="vid-item-name">${ep.title || `Episode ${ep.number || epIdx + 1}`}</div>
                   <div class="vid-item-meta">${ep.url || ''}</div>
                 </div>
                 <div class="vid-item-acts"><button class="tact approve" data-epidx="${epIdx}">Import</button></div>
@@ -241,13 +241,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url: ep.url })
                   });
+
                   const extData = await ext.json();
                   if (!ext.ok) throw new Error(extData.error || 'Extraction failed');
-                  if (!extData.best || !extData.best.url) throw new Error('No playable stream found');
+
+                  const playableUrl =
+                    extData.stream ||
+                    (Array.isArray(extData.sources) && extData.sources.length ? extData.sources[0].url : '');
+
+                  if (!playableUrl) throw new Error('No playable stream found');
+
                   switchSrc('stream');
-                  document.getElementById('streamUrl').value = extData.best.url;
+                  document.getElementById('streamUrl').value = playableUrl;
                   document.getElementById('sTitle').value = item.title || q;
-                  document.getElementById('sEp').value = ep.title || `Ep ${ep.number || epIdx+1}`;
+                  document.getElementById('sEp').value = ep.title || `Ep ${ep.number || epIdx + 1}`;
                   document.getElementById('sMeta').value = `${providerSel.value} import`;
                   addStreamUrl();
                   status.textContent = 'Imported successfully';
@@ -284,7 +291,7 @@
       fetch(`${API}/auth/session/${encodeURIComponent(sess.id)}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => { if (data && data.user && data.user.status === 'approved') launchApp(data.user); })
-        .catch(() => {});
+        .catch(() => { });
     }
   });
   setInterval(syncVideosIfChanged, 1500);
