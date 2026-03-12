@@ -323,37 +323,53 @@ app.get('/api/provider-episodes', async (req, res) => {
 
 app.post('/api/extract', async (req, res) => {
   const episodeId = String(req.body.url || '').trim();
-  const server = String(req.body.server || 'vidstreaming').trim();
-  const category = String(req.body.category || 'sub').trim().toLowerCase();
+  const preferredCategory = String(req.body.category || 'sub').trim().toLowerCase();
 
   if (!episodeId) return res.status(400).json({ error: 'Missing url' });
 
   try {
     const hi = await getHiAnimeScraper();
 
-    // optional: validate available servers first
-    let selectedServer = server;
-    try {
-      const serverData = await hi.getEpisodeServers(episodeId);
-      const pool = Array.isArray(serverData?.[category]) ? serverData[category] : [];
-      if (pool.length && !pool.some(s => s.serverName === selectedServer || s.serverId === selectedServer)) {
-        selectedServer = pool[0].serverName;
+    const serversData = await hi.getEpisodeServers(episodeId);
+
+    const categoryOrder = [preferredCategory, 'sub', 'dub', 'raw']
+      .filter((v, i, arr) => ['sub', 'dub', 'raw'].includes(v) && arr.indexOf(v) === i);
+
+    for (const category of categoryOrder) {
+      const pool = Array.isArray(serversData?.[category]) ? serversData[category] : [];
+
+      for (const srv of pool) {
+        const candidates = [
+          srv.serverName,
+          String(srv.serverId || ''),
+        ].filter(Boolean);
+
+        for (const candidate of candidates) {
+          try {
+            const data = await hi.getEpisodeSources(episodeId, candidate, category);
+
+            if (Array.isArray(data?.sources) && data.sources.length > 0) {
+              return res.json({
+                stream: data.sources[0].url || null,
+                sources: data.sources || [],
+                subtitles: data.subtitles || [],
+                headers: data.headers || {},
+                anilistID: data.anilistID ?? null,
+                malID: data.malID ?? null,
+                server: candidate,
+                category
+              });
+            }
+          } catch (innerErr) {
+            console.error(`extract candidate failed: ${candidate} (${category})`, innerErr?.message || innerErr);
+          }
+        }
       }
-    } catch (_) {
-      // if server lookup fails, just continue with the requested/default server
     }
 
-    const data = await hi.getEpisodeSources(episodeId, selectedServer, category);
-
-    res.json({
-      stream: Array.isArray(data?.sources) && data.sources.length ? data.sources[0].url : null,
-      sources: data?.sources || [],
-      subtitles: data?.subtitles || [],
-      headers: data?.headers || {},
-      anilistID: data?.anilistID ?? null,
-      malID: data?.malID ?? null,
-      server: selectedServer,
-      category
+    return res.status(404).json({
+      error: 'No playable stream found',
+      details: 'All available servers were tried, but none returned sources.'
     });
   } catch (err) {
     console.error('extract failed:', err);
