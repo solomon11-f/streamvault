@@ -1,3 +1,39 @@
+[variables]
+PLAYWRIGHT_BROWSERS_PATH = "/app/pw-browsers"
+
+[phases.setup]
+nixPkgs = [
+  "python313",
+  "glib",
+  "nss",
+  "nspr",
+  "atk",
+  "at-spi2-atk",
+  "cups",
+  "dbus",
+  "expat",
+  "libdrm",
+  "mesa",
+  "xcb-util-cursor",
+  "xorg.libX11",
+  "xorg.libXcomposite",
+  "xorg.libXdamage",
+  "xorg.libXext",
+  "xorg.libXfixes",
+  "xorg.libXrandr",
+  "xorg.libxcb",
+  "xorg.libxkbcommon",
+  "xorg.libXi",
+  "xorg.libXrender",
+  "pango",
+  "cairo",
+  "alsa-lib",
+  "gtk3",
+  "libgbm",
+  "fontconfig",
+  "freetype"
+]
+
 [phases.install]
 cmds = [
   "pip install -r requirements.txt",
