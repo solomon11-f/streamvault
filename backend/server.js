@@ -322,60 +322,51 @@ app.get('/api/provider-episodes', async (req, res) => {
 });
 
 app.post('/api/extract', async (req, res) => {
-  const episodeId = String(req.body.url || '').trim();
-  const preferredCategory = String(req.body.category || 'sub').trim().toLowerCase();
+  const url = String(req.body.url || '').trim();
 
-  if (!episodeId) return res.status(400).json({ error: 'Missing url' });
+  if (!url) {
+    return res.status(400).json({ error: 'Missing url' });
+  }
+
+  if (!process.env.SCRAPER_API_URL) {
+    return res.status(500).json({ error: 'SCRAPER_API_URL is not configured' });
+  }
 
   try {
-    const hi = await getHiAnimeScraper();
+    const response = await axios.post(
+      `${process.env.SCRAPER_API_URL.replace(/\/$/, '')}/extract`,
+      { url },
+      { timeout: 180000 }
+    );
 
-    const serversData = await hi.getEpisodeServers(episodeId);
+    const data = response.data || {};
 
-    const categoryOrder = [preferredCategory, 'sub', 'dub', 'raw']
-      .filter((v, i, arr) => ['sub', 'dub', 'raw'].includes(v) && arr.indexOf(v) === i);
+    const playableUrl =
+      data.stream ||
+      (Array.isArray(data.sources) && data.sources.length ? data.sources[0].url : '');
 
-    for (const category of categoryOrder) {
-      const pool = Array.isArray(serversData?.[category]) ? serversData[category] : [];
-
-      for (const srv of pool) {
-        const candidates = [
-          srv.serverName,
-          String(srv.serverId || ''),
-        ].filter(Boolean);
-
-        for (const candidate of candidates) {
-          try {
-            const data = await hi.getEpisodeSources(episodeId, candidate, category);
-
-            if (Array.isArray(data?.sources) && data.sources.length > 0) {
-              return res.json({
-                stream: data.sources[0].url || null,
-                sources: data.sources || [],
-                subtitles: data.subtitles || [],
-                headers: data.headers || {},
-                anilistID: data.anilistID ?? null,
-                malID: data.malID ?? null,
-                server: candidate,
-                category
-              });
-            }
-          } catch (innerErr) {
-            console.error(`extract candidate failed: ${candidate} (${category})`, innerErr?.message || innerErr);
-          }
-        }
-      }
+    if (!playableUrl) {
+      return res.status(404).json({
+        error: 'No playable stream found',
+        details: data.details || 'Python scraper did not return a playable source.'
+      });
     }
 
-    return res.status(404).json({
-      error: 'No playable stream found',
-      details: 'All available servers were tried, but none returned sources.'
+    return res.json({
+      stream: playableUrl,
+      sources: data.sources || [],
+      subtitles: data.subtitles || [],
+      headers: data.headers || {},
+      anilistID: data.anilistID ?? null,
+      malID: data.malID ?? null,
+      server: data.server || null,
+      category: data.category || null
     });
   } catch (err) {
-    console.error('extract failed:', err);
-    res.status(500).json({
+    console.error('extract proxy failed:', err.response?.data || err.message);
+    return res.status(err.response?.status || 500).json({
       error: 'Extraction failed',
-      details: err?.message || 'Unknown error'
+      details: err.response?.data || err.message
     });
   }
 });
