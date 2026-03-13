@@ -97,20 +97,25 @@ function normalizeProvider(provider) {
 }
 
 function mapSearchResults(data) {
-  const list = Array.isArray(data?.animes) ? data.animes : [];
+  const raw =
+    (Array.isArray(data) && data) ||
+    (Array.isArray(data?.animes) && data.animes) ||
+    (Array.isArray(data?.results) && data.results) ||
+    (Array.isArray(data?.data) && data.data) ||
+    [];
+
   return {
-    results: list.map((item) => ({
-      id: item.id,
-      title: item.name,
-      poster: item.poster,
-      type: item.type,
-      rating: item.rating,
-      duration: item.duration,
+    results: raw.map((item) => ({
+      id: item.id || item._id || item.url || item.slug,
+      title: item.name || item.title || item.englishName || item.romajiName || 'Unknown title',
+      poster: item.poster || item.image || item.cover || item.thumbnail || '',
+      type: item.type || item.format || '',
+      rating: item.rating || item.score || '',
+      duration: item.duration || '',
       episodes: item.episodes || {},
-      url: item.id
+      url: item.id || item._id || item.url || item.slug
     }))
   };
-}
 
 function mapEpisodes(data, animeId) {
   const list = Array.isArray(data?.episodes) ? data.episodes : [];
@@ -290,9 +295,25 @@ app.get('/api/provider-search', async (req, res) => {
 
   try {
     const hi = await getHiAnimeScraper();
-    const data = await hi.search(q);
+
+    let data;
+    if (typeof hi.getAnimeSearchResults === 'function') {
+      data = await hi.getAnimeSearchResults(q);
+    } else if (typeof hi.search === 'function') {
+      data = await hi.search(q);
+    } else {
+      throw new Error('No supported search method found on aniwatch package');
+    }
+
     res.json(mapSearchResults(data));
   } catch (err) {
+    console.error('provider-search failed:', err);
+    res.status(500).json({
+      error: 'Provider search failed',
+      details: err?.message || 'Unknown error'
+    });
+  }
+}); catch (err) {
     console.error('provider-search failed:', err);
     res.status(500).json({
       error: 'Provider search failed',
